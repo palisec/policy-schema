@@ -1,0 +1,20 @@
+{
+  "name": "@palisec/policy-schema",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical Palisec policy schema, reason codes, validation, and the deterministic local simulator.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./policy.schema.json": "./policy.schema.json"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "vitest": "^5.1.0"
+  },
+  "license": "MIT"
+}

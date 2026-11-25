@@ -1,0 +1,18 @@
+# gitleaks: the default rules, plus files that hold only test data (reviewed 2026-11-21).
+[extend]
+useDefault = true
+
+[[rules]]
+id = "zolva-api-key"
+description = "Zolva API key (zk_...)"
+regex = '''zk_[A-Za-z0-9_-]{16,}'''
+keywords = ["zk_"]
+[[rules.allowlists]]
+regexes = ['''zk_test_[A-Za-z0-9_-]+''']
+
+[allowlist]
+description = "Test data only: engine parity fixtures (random addresses and amounts) and the ERC test vectors (published test-only key)"
+paths = [
+  '''^engine-wasm/fixtures/parity\.jsonl$''',
+  '''(^|/)vectors(-v[0-9]+)?\.json$''',
+]

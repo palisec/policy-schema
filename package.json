@@ -1,0 +1,13 @@
+{
+  "name": "palisec-policy",
+  "private": true,
+  "license": "MIT",
+  "workspaces": [
+    "schema",
+    "engine-wasm"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm test --workspaces"
+  }
+}

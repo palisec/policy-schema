@@ -1,0 +1,22 @@
+[package]
+name = "palisec-policy-engine"
+version = "0.1.0"
+edition = "2021"
+description = "Palisec policy engine: the production evaluator for policy schema 1.0, built to WebAssembly."
+license = "UNLICENSED"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# preserve_order keeps JSON object keys in insertion order, as JavaScript objects do.
+serde_json = { version = "1", features = ["preserve_order"] }
+num-bigint = { version = "0.4", default-features = false, features = ["std"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

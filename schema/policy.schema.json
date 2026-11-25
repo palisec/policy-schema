@@ -1,0 +1,443 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://palisec.tech/schemas/policy/1.0.json",
+  "title": "Palisec policy",
+  "description": "Canonical policy document, schema version 1.0. Integers that can exceed 2^53 are decimal strings. Unknown fields are rejected.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "version",
+    "account",
+    "status",
+    "limits",
+    "cooldowns",
+    "contracts",
+    "human_approval",
+    "failure_mode"
+  ],
+  "$defs": {
+    "uint": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,77})$",
+      "description": "Non-negative integer as a decimal string. Never a float."
+    },
+    "address": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$"
+    },
+    "selector": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{8}$"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "enum": [
+        "1.0",
+        "1.1",
+        "1.2",
+        "1.3",
+        "1.4",
+        "1.5"
+      ],
+      "description": "1.0; 1.1 adds asset_safety; 1.2 upoch_recovery; 1.3 loss_limit; 1.4 proven_record; 1.5 token_spend."
+    },
+    "policy_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{3,64}$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647,
+      "description": "Assigned on activation. Pending approvals bind to it."
+    },
+    "account": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chain_id",
+        "address"
+      ],
+      "properties": {
+        "chain_id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "address": {
+          "$ref": "#/$defs/address"
+        }
+      }
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "active",
+        "disabled"
+      ]
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_transaction_value_wei",
+        "max_gas_cost_wei",
+        "hourly_budget_usd_micros",
+        "max_pending_operations",
+        "max_price_age_seconds"
+      ],
+      "properties": {
+        "max_transaction_value_wei": {
+          "$ref": "#/$defs/uint",
+          "description": "Native value per transaction, in wei."
+        },
+        "max_gas_cost_wei": {
+          "$ref": "#/$defs/uint",
+          "description": "Estimated total fee per transaction, in wei."
+        },
+        "hourly_budget_usd_micros": {
+          "$ref": "#/$defs/uint",
+          "description": "Rolling 3600-second budget in USD millionths, covering value plus fees."
+        },
+        "max_pending_operations": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "max_price_age_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "description": "Older prices fail closed with PS_STATE_001."
+        }
+      }
+    },
+    "cooldowns": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identical_calldata_seconds",
+        "identical_intent_seconds"
+      ],
+      "properties": {
+        "identical_calldata_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400
+        },
+        "identical_intent_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400
+        }
+      }
+    },
+    "contracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default",
+        "allowlist",
+        "denylist"
+      ],
+      "properties": {
+        "default": {
+          "const": "deny"
+        },
+        "allowlist": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "address",
+              "selectors",
+              "require_verified_code"
+            ],
+            "properties": {
+              "address": {
+                "$ref": "#/$defs/address"
+              },
+              "selectors": {
+                "type": "array",
+                "maxItems": 64,
+                "items": {
+                  "$ref": "#/$defs/selector"
+                }
+              },
+              "require_verified_code": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "denylist": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/address"
+          },
+          "description": "Explicit deny overrides any allow."
+        }
+      }
+    },
+    "human_approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "usd_threshold_micros",
+        "require_for_unknown_methods"
+      ],
+      "properties": {
+        "usd_threshold_micros": {
+          "$ref": "#/$defs/uint"
+        },
+        "require_for_unknown_methods": {
+          "type": "boolean",
+          "description": "true routes unknown selectors to review; false denies them with PS_METHOD_001."
+        }
+      }
+    },
+    "failure_mode": {
+      "const": "closed"
+    },
+    "asset_safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Schema 1.1 only. Simulated asset checks before allowing a contract call.",
+      "required": [
+        "enabled",
+        "max_transfer_tax_bps",
+        "max_slippage_bps",
+        "require_sell_simulation",
+        "block_unlimited_approvals",
+        "on_simulation_unavailable",
+        "max_simulation_age_seconds"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "max_transfer_tax_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "max_slippage_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "require_sell_simulation": {
+          "type": "boolean"
+        },
+        "block_unlimited_approvals": {
+          "type": "boolean"
+        },
+        "on_simulation_unavailable": {
+          "enum": [
+            "deny",
+            "review"
+          ]
+        },
+        "max_simulation_age_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300
+        }
+      }
+    },
+    "upoch_recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Schema 1.2: the agent must be recoverable on Upoch.",
+      "required": [
+        "require_upoch_recoverable",
+        "max_checkpoint_age_seconds",
+        "require_guardian",
+        "on_unavailable"
+      ],
+      "properties": {
+        "require_upoch_recoverable": {
+          "type": "boolean"
+        },
+        "max_checkpoint_age_seconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 31536000
+        },
+        "require_guardian": {
+          "type": "boolean"
+        },
+        "on_unavailable": {
+          "enum": [
+            "deny",
+            "review"
+          ]
+        }
+      }
+    },
+    "loss_limit": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Schema 1.3: a loss limit the agent cannot override (/docs/loss-limits).",
+      "required": [
+        "enabled",
+        "max_drawdown_bps",
+        "max_loss_usd_micros",
+        "window_seconds",
+        "on_breach",
+        "on_valuation_unavailable",
+        "stablecoins",
+        "exit_addresses",
+        "max_exit_slippage_bps",
+        "max_closed_market_price_age_seconds",
+        "reset_epoch"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "max_drawdown_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "max_loss_usd_micros": {
+          "$ref": "#/$defs/uint"
+        },
+        "window_seconds": {
+          "type": "integer",
+          "minimum": 3600,
+          "maximum": 604800
+        },
+        "on_breach": {
+          "enum": [
+            "pause_risk",
+            "review"
+          ]
+        },
+        "on_valuation_unavailable": {
+          "enum": [
+            "deny",
+            "review"
+          ]
+        },
+        "stablecoins": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/address"
+          }
+        },
+        "exit_addresses": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/address"
+          }
+        },
+        "max_exit_slippage_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "max_closed_market_price_age_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 604800
+        },
+        "reset_epoch": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        }
+      }
+    },
+    "proven_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Schema 1.4: bigger limits once the agent has a verified Zolva record (paper trading) and the link is verified from both sides; the unlock waits out the loosening delay. Each unlocked limit must be at least the policy's own (/docs/zolva).",
+      "required": [
+        "enabled",
+        "source",
+        "min_verified_hours",
+        "max_record_age_seconds",
+        "unlocked_limits"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "source": {
+          "const": "zolva"
+        },
+        "min_verified_hours": {
+          "type": "integer",
+          "minimum": 24,
+          "maximum": 8760
+        },
+        "max_record_age_seconds": {
+          "type": "integer",
+          "minimum": 600,
+          "maximum": 86400
+        },
+        "unlocked_limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "max_transaction_value_wei",
+            "hourly_budget_usd_micros"
+          ],
+          "properties": {
+            "max_transaction_value_wei": {
+              "$ref": "#/$defs/uint"
+            },
+            "hourly_budget_usd_micros": {
+              "$ref": "#/$defs/uint"
+            }
+          }
+        }
+      }
+    },
+    "token_spend": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Schema 1.5: the limits count tokens, not only ETH. Exposure becomes ETH value + fee + the USD value of every token the simulation shows leaving the account and every allowance left open; it counts in max_transaction_usd_micros, the hourly budget and the approval threshold. A spent token with no reliable Chainlink price is denied or held (PS_PRICE_001), never counted as $0; unknown outflows are denied (PS_SIM_002). Off when absent (/docs/policies#token-spend).",
+      "required": [
+        "enabled",
+        "max_transaction_usd_micros",
+        "on_price_unavailable",
+        "max_closed_market_price_age_seconds",
+        "require_output_to_account"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "max_transaction_usd_micros": {
+          "$ref": "#/$defs/uint",
+          "description": "Largest exposure of one transaction (ETH, fee and tokens), USD micros."
+        },
+        "on_price_unavailable": {
+          "enum": [
+            "deny",
+            "review"
+          ]
+        },
+        "max_closed_market_price_age_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 604800
+        },
+        "require_output_to_account": {
+          "type": "boolean",
+          "description": "A contract call that spends tokens must bring something back into the account (a swap's output)."
+        }
+      }
+    }
+  }
+}
